@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FIFA 2026 Knockout Predictor</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cabinet+Grotesk:wght@800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #f3f8f5;
+            background-image: 
+                radial-gradient(#d1e7dd 1.5px, transparent 1.5px),
+                radial-gradient(#d1e7dd 1.5px, #f3f8f5 1.5px);
+            background-size: 30px 30px;
+            background-position: 0 0, 15px 15px;
+        }
+
+        .heading-font {
+            font-family: 'Cabinet Grotesk', sans-serif;
+        }
+
+        /* Tactical blackboard design accents */
+        .doodle-bg {
+            position: absolute;
+            pointer-events: none;
+            opacity: 0.08;
+            z-index: 0;
+        }
+
+        .bracket-container::-webkit-scrollbar {
+            height: 10px;
+        }
+        .bracket-container::-webkit-scrollbar-track {
+            background: #e6f0ea;
+            border-radius: 10px;
+        }
+        .bracket-container::-webkit-scrollbar-thumb {
+            background: #198754;
+            border-radius: 10px;
+        }
+
+        /* Connection lines */
+        #svgLines {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        /* Drag and Drop Visual States */
+        .draggable {
+            cursor: grab;
+            transition: all 0.2s ease;
+        }
+        .draggable:active {
+            cursor: grabbing;
+        }
+        .draggable:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(25, 135, 84, 0.15);
+        }
+        .dropzone-active {
+            border: 2px dashed #198754 !important;
+            background-color: #e8f5e9 !important;
+        }
+
+        /* Floating Animation */
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-8px); }
+            100% { transform: translateY(0px); }
+        }
+        .float-anim {
+            animation: float 4s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body class="relative min-h-screen overflow-x-hidden pb-12">
+
+<!-- Decorative Football Doodles (Background) -->
+<div class="doodle-bg top-10 left-10 w-48 h-48 float-anim">
+    <svg viewBox="0 0 100 100" fill="none" stroke="#198754" stroke-width="2">
+        <path d="M10 90 V30 H90 V90 M10 40 H90 M50 30 V90" stroke-dasharray="4"/>
+        <circle cx="50" cy="65" r="12" />
+        <path d="M50 53 L50 77 M38 65 H62"/>
+    </svg>
+</div>
+
+<div class="doodle-bg top-24 right-10 w-44 h-44 float-anim" style="animation-delay: 1.5s;">
+    <svg viewBox="0 0 100 100" fill="none" stroke="#198754" stroke-width="2">
+        <circle cx="20" cy="30" r="6" />
+        <circle cx="50" cy="70" r="6" />
+        <path d="M 20 50 L 35 65 M 65 30 L 80 45" stroke-width="3"/>
+        <path d="M 80 30 L 65 45" stroke-width="3"/>
+        <path d="M 25 30 Q 55 30 50 60" stroke-dasharray="3" />
+        <path d="M 50 78 Q 80 78 75 50" stroke-dasharray="3"/>
+    </svg>
+</div>
+
+<div class="doodle-bg bottom-10 left-1/4 w-40 h-40 float-anim" style="animation-delay: 3s;">
+    <svg viewBox="0 0 100 100" fill="none" stroke="#198754" stroke-width="2">
+        <path d="M20 50 C20 30, 60 30, 60 50 C60 70, 20 70, 20 50 Z" />
+        <path d="M60 40 H85 V60 H60" />
+        <circle cx="40" cy="50" r="8" />
+        <circle cx="75" cy="45" r="3" fill="#198754"/>
+    </svg>
+</div>
+
+<!-- Main App Wrapper -->
+<div class="relative z-10 max-w-[1700px] mx-auto px-4 sm:px-6 lg:px-8 pt-8">
+    
+    <!-- App Header -->
+    <header class="text-center mb-8">
+        <div class="inline-flex items-center gap-3 bg-emerald-100 text-emerald-800 px-4 py-1.5 rounded-full text-sm font-semibold mb-4 border border-emerald-200 shadow-sm">
+            <i data-lucide="trophy" class="w-4 h-4 text-amber-500 animate-pulse"></i>
+            USA • CANADA • MEXICO 2026
+        </div>
+        <h1 class="heading-font text-4xl sm:text-5xl text-slate-900 tracking-tight">
+            FIFA 2026 <span class="text-emerald-600 relative">knockout predictor<span class="absolute bottom-1 left-0 w-full h-2 bg-emerald-200/60 -z-10"></span></span>
+        </h1>
+        <p class="text-slate-600 mt-2 text-md max-w-2xl mx-auto">
+            Build your prediction bracket. <span class="font-semibold text-emerald-700">Drag & Drop</span> a winning team or simply <span class="font-semibold text-emerald-700">Click/Tap</span> them to advance!
+        </p>
+    </header>
+
+    <!-- Bracket Arena (Horizontal Scroll View) -->
+    <div class="bracket-container overflow-x-auto pb-8 relative" id="bracketWrapper">
+        <!-- SVG Connector Lines Container -->
+        <svg id="svgLines" class="min-h-[1620px]"></svg>
+
+        <!-- Structured Flex Row for Rounds -->
+        <div class="flex items-start justify-between gap-6 min-w-[1550px] px-4 relative z-10 min-h-[1620px]">
+            
+            <!-- Round of 32 (16 Matches - Height: 100px per block) -->
+            <div class="w-[240px] flex-shrink-0">
+                <div class="text-center mb-6 bg-white/80 backdrop-blur-sm border border-slate-200 py-2.5 rounded-xl shadow-sm">
+                    <h3 class="heading-font text-sm text-slate-800">Round of 32</h3>
+                    <span class="text-[10px] text-slate-500 font-bold tracking-wider uppercase">16 Matchups</span>
+                </div>
+                <div class="flex flex-col" id="r32">
+                    <!-- Dynamic Generation -->
+                </div>
+            </div>
+
+            <!-- Round of 16 (8 Matches - Height: 200px per block) -->
+            <div class="w-[240px] flex-shrink-0">
+                <div class="text-center mb-6 bg-white/80 backdrop-blur-sm border border-slate-200 py-2.5 rounded-xl shadow-sm">
+                    <h3 class="heading-font text-sm text-slate-800">Round of 16</h3>
+                    <span class="text-[10px] text-slate-500 font-bold tracking-wider uppercase">8 Matchups</span>
+                </div>
+                <div class="flex flex-col" id="r16">
+                    <!-- Dynamic Generation -->
+                </div>
+            </div>
+
+            <!-- Quarterfinals (4 Matches - Height: 400px per block) -->
+            <div class="w-[240px] flex-shrink-0">
+                <div class="text-center mb-6 bg-white/80 backdrop-blur-sm border border-slate-200 py-2.5 rounded-xl shadow-sm">
+                    <h3 class="heading-font text-sm text-slate-800">Quarter-Finals</h3>
+                    <span class="text-[10px] text-slate-500 font-bold tracking-wider uppercase">4 Matchups</span>
+                </div>
+                <div class="flex flex-col" id="qf">
+                    <!-- Dynamic Generation -->
+                </div>
+            </div>
+
+            <!-- Semifinals (2 Matches - Height: 800px per block) -->
+            <div class="w-[240px] flex-shrink-0">
+                <div class="text-center mb-6 bg-white/80 backdrop-blur-sm border border-slate-200 py-2.5 rounded-xl shadow-sm">
+                    <h3 class="heading-font text-sm text-slate-800">Semi-Finals</h3>
+                    <span class="text-[10px] text-slate-500 font-bold tracking-wider uppercase">2 Matchups</span>
+                </div>
+                <div class="flex flex-col" id="sf">
+                    <!-- Dynamic Generation -->
+                </div>
+            </div>
+
+            <!-- Finals (1 Match - Height: 1600px block) -->
+            <div class="w-[240px] flex-shrink-0">
+                <div class="text-center mb-6 bg-white/80 backdrop-blur-sm border border-slate-200 py-2.5 rounded-xl shadow-sm">
+                    <h3 class="heading-font text-sm text-slate-800">Final</h3>
+                    <span class="text-[10px] text-slate-500 font-bold tracking-wider uppercase">Champion Match</span>
+                </div>
+                <div class="flex flex-col" id="finals">
+                    <!-- Dynamic Generation -->
+                </div>
+            </div>
+
+            <!-- Winner Podium Slot (Height: 1600px aligned block) -->
+            <div class="w-[260px] flex-shrink-0 flex flex-col">
+                <div class="text-center mb-6 bg-white/80 backdrop-blur-sm border border-slate-200 py-2.5 rounded-xl shadow-sm">
+                    <h3 class="heading-font text-sm text-slate-800">Gold Medal</h3>
+                    <span class="text-[10px] text-slate-500 font-bold tracking-wider uppercase">Winner Prediction</span>
+                </div>
+                <div class="h-[1600px] flex items-center justify-center">
+                    <!-- Podium / Trophy Card -->
+                    <div class="bg-gradient-to-b from-amber-50 to-amber-100/60 border-2 border-amber-300 rounded-3xl p-6 shadow-xl w-full text-center relative overflow-hidden flex flex-col items-center justify-center min-h-[220px]">
+                        <div class="absolute top-0 right-0 transform translate-x-4 -translate-y-4 opacity-10 text-amber-500">
+                            <i data-lucide="award" class="w-36 h-36"></i>
+                        </div>
+                        
+                        <div class="bg-amber-400 text-amber-950 p-3.5 rounded-full mb-4 shadow-md float-anim">
+                            <i data-lucide="trophy" class="w-8 h-8"></i>
+                        </div>
+
+                        <div id="champ-drop" 
+                             class="dropzone w-full p-4 rounded-2xl bg-white/80 border border-dashed border-amber-300 flex flex-col items-center justify-center gap-2 transition-all min-h-[80px]"
+                             data-round="champion" data-match="m1" data-slot="t1">
+                            <span class="text-amber-800/60 font-semibold text-xs italic">Drop Champion Here</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+    // Country flag ISO shortcodes
+    const teamsData = {
+        "South Africa": "za", "Canada": "ca", "Brazil": "br", "Japan": "jp",
+        "Germany": "de", "Sweden": "se", "Morocco": "ma", "Netherlands": "nl",
+        "Ivory Coast": "ci", "Norway": "no", "France": "fr", "Ecuador": "ec",
+        "Mexico": "mx", "Bosnia & Herz.": "ba", "USA": "us", "Paraguay": "py",
+        "Spain": "es", "Egypt": "eg", "Argentina": "ar", "Cape Verde": "cv",
+        "Belgium": "be", "Australia": "au", "Portugal": "pt", "Colombia": "co",
+        "England": "gb", "Senegal": "sn", "Switzerland": "ch", "Ghana": "gh",
+        "Croatia": "hr", "Algeria": "dz", "Austria": "at", "Uzbekistan": "uz"
+    };
+
+    const initialMatchups = [
+        { t1: "South Africa", t2: "Canada" }, { t1: "Brazil", t2: "Japan" },
+        { t1: "Germany", t2: "Sweden" }, { t1: "Morocco", t2: "Netherlands" },
+        { t1: "Ivory Coast", t2: "Norway" }, { t1: "France", t2: "Ecuador" },
+        { t1: "Mexico", t2: "Bosnia & Herz." }, { t1: "USA", t2: "Paraguay" },
+        { t1: "Spain", t2: "Egypt" }, { t1: "Argentina", t2: "Cape Verde" },
+        { t1: "Belgium", t2: "Australia" }, { t1: "Portugal", t2: "Colombia" },
+        { t1: "England", t2: "Senegal" }, { t1: "Switzerland", t2: "Ghana" },
+        { t1: "Croatia", t2: "Algeria" }, { t1: "Austria", t2: "Uzbekistan" }
+    ];
+
+    function init() {
+        buildR32();
+        buildEmptyRound('r16', 8, 200);
+        buildEmptyRound('qf', 4, 400);
+        buildEmptyRound('sf', 2, 800);
+        buildEmptyRound('finals', 1, 1600);
+        setupDragAndDrop();
+        lucide.createIcons();
+        setTimeout(drawTreeLines, 300);
+    }
+
+    function getFlagImg(teamName) {
+        if (!teamName || teamName === "?" || !teamsData[teamName]) {
+            return `<div class="w-6 h-4 bg-slate-100 border border-slate-200 rounded-sm"></div>`;
+        }
+        return `<img class="w-6 h-4 object-cover rounded-sm shadow-sm border border-slate-200" src="https://flagcdn.com/w40/${teamsData[teamName]}.png" alt="${teamName}">`;
+    }
+
+    function buildR32() {
+        const container = document.getElementById('r32');
+        initialMatchups.forEach((m, idx) => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'h-[100px] flex items-center justify-center w-full px-1';
+            wrapper.innerHTML = createMatchupHTML('r32', `m${idx+1}`, m.t1, m.t2, false, false);
+            container.appendChild(wrapper);
+        });
+    }
+
+    function buildEmptyRound(roundId, count, cellHeight) {
+        const container = document.getElementById(roundId);
+        for (let i = 1; i <= count; i++) {
+            const wrapper = document.createElement('div');
+            wrapper.className = `h-[${cellHeight}px] flex items-center justify-center w-full px-1`;
+            // Tailwind dynamic utility class safety fallbacks for exact pixel values
+            wrapper.style.height = `${cellHeight}px`;
+            wrapper.innerHTML = createMatchupHTML(roundId, `m${i}`, "?", "?", true, true);
+            container.appendChild(wrapper);
+        }
+    }
+
+    function createMatchupHTML(round, matchId, t1, t2, isT1Drop, isT2Drop) {
+        const displayT1 = t1 === "?" ? "TBD Matchup Winner" : t1;
+        const displayT2 = t2 === "?" ? "TBD Matchup Winner" : t2;
+        const isPlaceholderT1 = t1 === "?";
+        const isPlaceholderT2 = t2 === "?";
+
+        return `
+            <div class="matchup bg-white rounded-xl border border-slate-200 shadow-sm w-full overflow-hidden hover:border-slate-300 transition-all" id="${round}_${matchId}">
+                <!-- Match Metadata Header -->
+                <div class="bg-slate-50/80 px-2.5 py-1 text-[9px] font-bold text-slate-400 uppercase tracking-wider flex justify-between border-b border-slate-100">
+                    <span>Match ${matchId.replace('m', '')}</span>
+                    <span class="text-emerald-600">${round.toUpperCase()}</span>
+                </div>
+
+                <!-- Team 1 Slot -->
+                <div class="team-slot p-2.5 flex items-center justify-between border-b border-slate-100 transition-colors ${isPlaceholderT1 ? 'dropzone text-slate-400 italic text-xs' : 'draggable text-slate-800 font-semibold text-xs'}" 
+                     draggable="${!isPlaceholderT1}" 
+                     data-round="${round}" 
+                     data-match="${matchId}" 
+                     data-slot="t1"
+                     onclick="handleSlotInteraction(this)">
+                    <div class="flex items-center gap-2">
+                        ${getFlagImg(t1)}
+                        <span class="truncate max-w-[130px]">${displayT1}</span>
+                    </div>
+                    <i data-lucide="chevron-right" class="w-3.5 h-3.5 text-slate-300 pointer-events-none"></i>
+                </div>
+
+                <!-- Team 2 Slot -->
+                <div class="team-slot p-2.5 flex items-center justify-between transition-colors ${isPlaceholderT2 ? 'dropzone text-slate-400 italic text-xs' : 'draggable text-slate-800 font-semibold text-xs'}" 
+                     draggable="${!isPlaceholderT2}" 
+                     data-round="${round}" 
+                     data-match="${matchId}" 
+                     data-slot="t2"
+                     onclick="handleSlotInteraction(this)">
+                    <div class="flex items-center gap-2">
+                        ${getFlagImg(t2)}
+                        <span class="truncate max-w-[130px]">${displayT2}</span>
+                    </div>
+                    <i data-lucide="chevron-right" class="w-3.5 h-3.5 text-slate-300 pointer-events-none"></i>
+                </div>
+            </div>
+        `;
+    }
+
+    function getTargetMapping(sourceRound, sourceMatchNum, teamSlot) {
+        const nextRoundMap = { 'r32': 'r16', 'r16': 'qf', 'qf': 'sf', 'sf': 'finals', 'finals': 'champion' };
+        const nextRound = nextRoundMap[sourceRound];
+        if (!nextRound) return null;
+
+        if (nextRound === 'champion') {
+            return { round: 'champion', match: 'm1', slot: 't1' };
+        }
+
+        const targetMatchNum = Math.ceil(sourceMatchNum / 2);
+        const targetSlot = (sourceMatchNum % 2 !== 0) ? 't1' : 't2';
+
+        return {
+            round: nextRound,
+            match: `m${targetMatchNum}`,
+            slot: targetSlot
+        };
+    }
+
+    function advanceTeam(teamName, sRound, sMatch, sSlot) {
+        if (!teamName || teamName === "TBD Matchup Winner" || teamName === "Empty Slot") return;
+
+        const mapping = getTargetMapping(sRound, parseInt(sMatch.replace('m', '')), sSlot);
+        if (!mapping) return;
+
+        let targetSlotEl;
+        if (mapping.round === 'champion') {
+            targetSlotEl = document.getElementById('champ-drop');
+        } else {
+            const targetMatchEl = document.getElementById(`${mapping.round}_${mapping.match}`);
+            if (targetMatchEl) {
+                const slots = targetMatchEl.querySelectorAll('.team-slot');
+                targetSlotEl = mapping.slot === 't1' ? slots[0] : slots[1];
+            }
+        }
+
+        if (targetSlotEl) {
+            const currentHeldTeam = targetSlotEl.querySelector('span')?.innerText;
+            if (currentHeldTeam && currentHeldTeam !== teamName && currentHeldTeam !== "TBD Matchup Winner") {
+                clearDownstreamTree(mapping.round, mapping.match, mapping.slot);
+            }
+
+            targetSlotEl.innerHTML = `
+                <div class="flex items-center gap-2">
+                    ${getFlagImg(teamName)}
+                    <span class="truncate max-w-[130px]">${teamName}</span>
+                </div>
+                <i data-lucide="chevron-right" class="w-3.5 h-3.5 text-emerald-500 pointer-events-none"></i>
+            `;
+            targetSlotEl.className = `team-slot p-2.5 flex items-center justify-between transition-colors draggable text-slate-800 font-semibold text-xs bg-emerald-50/50 hover:bg-emerald-50`;
+            targetSlotEl.setAttribute('draggable', 'true');
+            
+            lucide.createIcons();
+            highlightWinnerSlot(sRound, sMatch, sSlot);
+        }
+    }
+
+    function highlightWinnerSlot(round, match, activeSlot) {
+        const matchEl = document.getElementById(`${round}_${match}`);
+        if (!matchEl) return;
+
+        const slots = matchEl.querySelectorAll('.team-slot');
+        slots.forEach(slot => {
+            if (slot.dataset.slot === activeSlot) {
+                slot.classList.add('bg-emerald-50', 'text-emerald-700', 'border-emerald-100');
+                slot.classList.remove('bg-rose-50/40', 'text-slate-400');
+            } else {
+                slot.classList.add('bg-rose-50/40', 'text-slate-400');
+                slot.classList.remove('bg-emerald-50', 'text-emerald-700', 'border-emerald-100');
+            }
+        });
+        drawTreeLines();
+    }
+
+    function clearDownstreamTree(startRound, startMatch, startSlot) {
+        const roundOrder = ['r32', 'r16', 'qf', 'sf', 'finals', 'champion'];
+        let idx = roundOrder.indexOf(startRound);
+        let matchNum = parseInt(startMatch.replace('m', ''));
+        let currentSlot = startSlot;
+
+        while (idx < roundOrder.length) {
+            const round = roundOrder[idx];
+            
+            if (round === 'champion') {
+                const champ = document.getElementById('champ-drop');
+                champ.innerHTML = `<span class="text-amber-800/60 font-semibold text-xs italic">Drop Champion Here</span>`;
+                champ.className = "dropzone w-full p-4 rounded-2xl bg-white/85 border border-dashed border-amber-300 flex flex-col items-center justify-center gap-2 transition-all min-h-[80px]";
+                break;
+            }
+
+            const targetMatch = document.getElementById(`${round}_m${matchNum}`);
+            if (targetMatch) {
+                const slots = targetMatch.querySelectorAll('.team-slot');
+                const targetSlotEl = currentSlot === 't1' ? slots[0] : slots[1];
+
+                if (targetSlotEl) {
+                    targetSlotEl.innerHTML = `
+                        <div class="flex items-center gap-2">
+                            ${getFlagImg("?")}
+                            <span class="truncate max-w-[130px]">TBD Matchup Winner</span>
+                        </div>
+                        <i data-lucide="chevron-right" class="w-3.5 h-3.5 text-slate-300 pointer-events-none"></i>
+                    `;
+                    targetSlotEl.className = "team-slot p-2.5 flex items-center justify-between transition-colors dropzone text-slate-400 italic text-xs";
+                    targetSlotEl.setAttribute('draggable', 'false');
+                }
+            }
+
+            currentSlot = (matchNum % 2 !== 0) ? 't1' : 't2';
+            matchNum = Math.ceil(matchNum / 2);
+            idx++;
+        }
+        lucide.createIcons();
+        drawTreeLines();
+    }
+
+    function handleSlotInteraction(el) {
+        if (el.classList.contains('dropzone')) return;
+        const teamName = el.querySelector('span').innerText;
+        advanceTeam(teamName, el.dataset.round, el.dataset.match, el.dataset.slot);
+    }
+
+    function setupDragAndDrop() {
+        let draggedData = null;
+
+        document.addEventListener('dragstart', (e) => {
+            const slot = e.target.closest('.draggable');
+            if (!slot || slot.classList.contains('dropzone')) {
+                e.preventDefault();
+                return;
+            }
+            draggedData = {
+                teamName: slot.querySelector('span').innerText,
+                round: slot.dataset.round,
+                match: slot.dataset.match,
+                slot: slot.dataset.slot
+            };
+            e.dataTransfer.setData('text/plain', draggedData.teamName);
+        });
+
+        document.addEventListener('dragover', (e) => {
+            const targetSlot = e.target.closest('.team-slot, #champ-drop');
+            if (targetSlot && draggedData && targetSlot.dataset.round !== 'r32') {
+                const mapping = getTargetMapping(draggedData.round, parseInt(draggedData.match.replace('m','')), draggedData.slot);
+                
+                if (mapping && mapping.round === targetSlot.dataset.round && mapping.match === targetSlot.dataset.match && mapping.slot === targetSlot.dataset.slot) {
+                    e.preventDefault();
+                    targetSlot.classList.add('dropzone-active');
+                }
+            }
+        });
+
+        document.addEventListener('dragleave', (e) => {
+            const targetSlot = e.target.closest('.team-slot, #champ-drop');
+            if (targetSlot) {
+                targetSlot.classList.remove('dropzone-active');
+            }
+        });
+
+        document.addEventListener('drop', (e) => {
+            const targetSlot = e.target.closest('.team-slot, #champ-drop');
+            if (targetSlot && draggedData && targetSlot.dataset.round !== 'r32') {
+                const mapping = getTargetMapping(draggedData.round, parseInt(draggedData.match.replace('m','')), draggedData.slot);
+                
+                if (mapping && mapping.round === targetSlot.dataset.round && mapping.match === targetSlot.dataset.match && mapping.slot === targetSlot.dataset.slot) {
+                    e.preventDefault();
+                    targetSlot.classList.remove('dropzone-active');
+                    advanceTeam(draggedData.teamName, draggedData.round, draggedData.match, draggedData.slot);
+                }
+            }
+        });
+    }
+
+    function drawTreeLines() {
+        const svg = document.getElementById('svgLines');
+        const wrapper = document.getElementById('bracketWrapper');
+        svg.innerHTML = '';
+        
+        const rounds = ['r32', 'r16', 'qf', 'sf', 'finals'];
+        
+        for (let r = 0; r < rounds.length - 1; r++) {
+            const currentRoundId = rounds[r];
+            const nextRoundId = rounds[r+1];
+            const matchContainers = document.getElementById(currentRoundId).querySelectorAll('.matchup');
+            
+            matchContainers.forEach((match) => {
+                const matchId = parseInt(match.id.split('_')[1].replace('m',''));
+                const nextMatchId = Math.ceil(matchId / 2);
+                const nextMatchEl = document.getElementById(`${nextRoundId}_m${nextMatchId}`);
+                
+                if (nextMatchEl) {
+                    const rectStart = match.getBoundingClientRect();
+                    const rectEnd = nextMatchEl.getBoundingClientRect();
+                    const wrapperRect = wrapper.getBoundingClientRect();
+
+                    const startX = rectStart.right - wrapperRect.left + wrapper.scrollLeft;
+                    const startY = rectStart.top + (rectStart.height / 2) - wrapperRect.top + wrapper.scrollTop;
+                    const endX = rectEnd.left - wrapperRect.left + wrapper.scrollLeft;
+                    const endY = rectEnd.top + (rectEnd.height / 2) - wrapperRect.top + wrapper.scrollTop;
+                    const midX = startX + 16; 
+
+                    const isCompletedMatchup = !match.querySelectorAll('.team-slot')[0].classList.contains('dropzone') && !match.querySelectorAll('.team-slot')[1].classList.contains('dropzone');
+                    const strokeColor = isCompletedMatchup ? '#10b981' : '#cbd5e1';
+                    const strokeWidth = isCompletedMatchup ? '2.5' : '1.5';
+
+                    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                    path.setAttribute("d", `M ${startX} ${startY} H ${midX} V ${endY} H ${endX}`);
+                    path.setAttribute("stroke", strokeColor);
+                    path.setAttribute("stroke-width", strokeWidth);
+                    path.setAttribute("fill", "none");
+                    path.setAttribute("style", "transition: stroke 0.3s ease, stroke-width 0.3s ease;");
+                    svg.appendChild(path);
+                }
+            });
+        }
+    }
+
+    window.addEventListener('resize', drawTreeLines);
+    window.onload = init;
+</script>
+</body>
+</html>
