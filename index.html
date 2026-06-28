@@ -671,59 +671,121 @@
 
         const bracketWrapper = document.getElementById('bracketWrapper');
 
-        try {
-            // Override browser viewport boundaries to capture all columns out of view
-            const originalOverflow = bracketWrapper.style.overflowX;
-            const originalWidth = bracketWrapper.style.width;
-            
-            bracketWrapper.style.overflowX = 'visible';
-            bracketWrapper.style.width = bracketWrapper.scrollWidth + 'px';
+        // Stash original styles
+        const originalOverflow = bracketWrapper.style.overflowX;
+        const originalWidth    = bracketWrapper.style.width;
+        const originalMaxWidth = bracketWrapper.style.maxWidth;
 
-            const canvas = await html2canvas(bracketWrapper, {
-                useCORS: true,
-                allowTaint: false,
-                scrollX: 0,
-                scrollY: 0,
-                width: bracketWrapper.scrollWidth,
-                height: bracketWrapper.scrollHeight,
-                backgroundColor: '#f3f8f5'
+        try {
+            // --- 1. Expand the container so html2canvas can see every column ---
+            bracketWrapper.style.overflowX = 'visible';
+            bracketWrapper.style.width     = bracketWrapper.scrollWidth + 'px';
+            bracketWrapper.style.maxWidth  = 'none';
+
+            // --- 2. Temporarily strip backdrop-blur (html2canvas can't render it) ---
+            const blurEls = bracketWrapper.querySelectorAll('[class*="backdrop-blur"]');
+            const savedFilters = [];
+            blurEls.forEach(el => {
+                savedFilters.push({ el, filter: el.style.backdropFilter, webkitFilter: el.style.webkitBackdropFilter });
+                el.style.backdropFilter = 'none';
+                el.style.webkitBackdropFilter = 'none';
             });
 
-            // Restore the normal scroll view
-            bracketWrapper.style.overflowX = originalOverflow;
-            bracketWrapper.style.width = originalWidth;
+            // --- 3. Give the DOM a tick to settle before snapshotting ---
+            await new Promise(r => setTimeout(r, 100));
 
+            // --- 4. Capture at device pixel ratio for crisp output on HiDPI screens ---
+            const dpr    = Math.min(window.devicePixelRatio || 1, 3); // cap at 3x to avoid huge files
+            const capW   = bracketWrapper.scrollWidth;
+            const capH   = bracketWrapper.scrollHeight;
+
+            const canvas = await html2canvas(bracketWrapper, {
+                useCORS:         true,
+                allowTaint:      false,
+                logging:         false,
+                scale:           dpr,          // ← KEY FIX: renders at native screen density
+                scrollX:         0,
+                scrollY:         0,
+                x:               0,
+                y:               0,
+                width:           capW,
+                height:          capH,
+                windowWidth:     capW,
+                windowHeight:    capH,
+                backgroundColor: '#f3f8f5',
+                imageTimeout:    15000,
+                onclone: (clonedDoc) => {
+                    // Make sure the SVG lines are fully visible in the clone
+                    const svg = clonedDoc.getElementById('svgLines');
+                    if (svg) {
+                        svg.style.position = 'absolute';
+                        svg.style.overflow = 'visible';
+                    }
+                    // Replace any remaining backdrop-blur in the clone with a solid fallback
+                    clonedDoc.querySelectorAll('[class*="backdrop-blur"]').forEach(el => {
+                        el.style.backdropFilter       = 'none';
+                        el.style.webkitBackdropFilter = 'none';
+                        // Give glassy elements a solid white background so they still look clean
+                        if (!el.style.backgroundColor || el.style.backgroundColor === '') {
+                            el.style.backgroundColor = 'rgba(255,255,255,0.92)';
+                        }
+                    });
+                }
+            });
+
+            // --- 5. Restore original styles & backdrop-blur ---
+            bracketWrapper.style.overflowX = originalOverflow;
+            bracketWrapper.style.width     = originalWidth;
+            bracketWrapper.style.maxWidth  = originalMaxWidth;
+            savedFilters.forEach(({ el, filter, webkitFilter }) => {
+                el.style.backdropFilter       = filter;
+                el.style.webkitBackdropFilter = webkitFilter;
+            });
+
+            // --- 6. Export as high-quality PNG ---
             const imageURI = canvas.toDataURL('image/png');
 
             if (navigator.canShare && navigator.share) {
                 const response = await fetch(imageURI);
-                const blob = await response.blob();
-                const file = new File([blob], 'my_2026_predictor.png', { type: 'image/png' });
+                const blob     = await response.blob();
+                const file     = new File([blob], 'my_2026_predictor.png', { type: 'image/png' });
 
-                await navigator.share({
-                    title: 'My FIFA 2026 Prediction Bracket',
-                    text: 'Check out my predictions for the FIFA World Cup 2026 Knockout Phase!',
-                    files: [file]
-                });
-                showToast("Prediction shared successfully!", "success");
+                if (navigator.canShare({ files: [file] })) {
+                    await navigator.share({
+                        title: 'My FIFA 2026 Prediction Bracket',
+                        text:  'Check out my predictions for the FIFA World Cup 2026 Knockout Phase!',
+                        files: [file]
+                    });
+                    showToast("Prediction shared successfully!", "success");
+                } else {
+                    // Device supports share but not file sharing — fall back to download
+                    triggerDownload(imageURI);
+                }
             } else {
-                // Direct download fallback if Web Share API is blocked or unsupported
-                const downloadLink = document.createElement('a');
-                downloadLink.href = imageURI;
-                downloadLink.download = 'my_2026_predictor.png';
-                document.body.appendChild(downloadLink);
-                downloadLink.click();
-                document.body.removeChild(downloadLink);
-                showToast("Sharing not supported natively; bracket downloaded as PNG!", "success");
+                triggerDownload(imageURI);
             }
-            
+
             closeShareModal();
         } catch (error) {
             console.error("Screenshot error: ", error);
+            // Restore styles even on error
+            bracketWrapper.style.overflowX = originalOverflow;
+            bracketWrapper.style.width     = originalWidth;
+            bracketWrapper.style.maxWidth  = originalMaxWidth;
             showToast("Failed to compile image. Check browser permissions.", "error");
         } finally {
             btnText.innerText = originalText;
         }
+    }
+
+    function triggerDownload(imageURI) {
+        const downloadLink = document.createElement('a');
+        downloadLink.href     = imageURI;
+        downloadLink.download = 'my_2026_predictor.png';
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+        showToast("Bracket downloaded as PNG!", "success");
     }
 
     window.addEventListener('resize', drawTreeLines);
